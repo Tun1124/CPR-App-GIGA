@@ -11,10 +11,8 @@ import {
   shouldContinueRush, calcRank, calcGameAdvice,
 } from '../utils/gameScoring';
 import {
-  HOLD, HOLD_BONUS, HOLD_SLOTS, CUE_INFO,
-  calcMomentum, rollHoldColor, isConfirmedHold, rollCue,
+  CUE_INFO, nextCue, CUE_DISPLAY_MS,
   rollRushOutro, OUTRO_STEPS, isMilestone,
-  CUE_COOLDOWN_MS, CUE_DISPLAY_MS,
 } from '../utils/effectDirector';
 import * as sfx from '../utils/sound';
 
@@ -53,7 +51,6 @@ export default function RhythmGame() {
     score: 0, combo: 0, gauge: 0, bpm: 0, isRush: false, rushRemain: 0, remainSec: 120,
   });
   const [notes, setNotes] = useState([]);
-  const [holds, setHolds] = useState([]);
   const [judge, setJudge] = useState(null);
   const [burstKey, setBurstKey] = useState(0);
   const [cue, setCue] = useState(null);
@@ -62,12 +59,11 @@ export default function RhythmGame() {
   // 毎フレーム更新する値は ref で保持（再レンダリングを避ける）
   const stateRef = useRef(createGameState());
   const notesRef = useRef([]);
-  const holdsRef = useRef([]);
   const recentJudgesRef = useRef([]);
   const noteIdRef = useRef(0);
   const nextSpawnRef = useRef(0);
   const startedAtRef = useRef(0);
-  const lastCueAtRef = useRef(0);
+  const cueIndexRef = useRef(-1);   // 直前までに出した予告演出の段階
   const cueTimerRef = useRef(null);
   const cutinTimerRef = useRef([]);
   const phaseOffsetRef = useRef(0);   // ノーツの位相（プレイヤーに追従させる）
@@ -126,14 +122,19 @@ export default function RhythmGame() {
     });
   }
 
-  /** 保留を1つ補充する */
-  function refillHold() {
-    const st = stateRef.current;
-    const momentum = calcMomentum(recentJudgesRef.current);
-    while (holdsRef.current.length < HOLD_SLOTS) {
-      holdsRef.current.push(rollHoldColor(momentum, st.combo, st.gauge));
-    }
-    setHolds([...holdsRef.current]);
+  /** コンボの節目に達したら予告演出を出す */
+  function updateCue(combo) {
+    // コンボが切れたら、また最初から出せるようにする
+    if (combo === 0) { cueIndexRef.current = -1; return; }
+
+    const hit = nextCue(combo, cueIndexRef.current);
+    if (!hit) return;
+
+    cueIndexRef.current = hit.index;
+    setCue(hit.cue);
+    sfx.playCue(CUE_INFO[hit.cue].tier);
+    if (cueTimerRef.current) clearTimeout(cueTimerRef.current);
+    cueTimerRef.current = setTimeout(() => setCue(null), CUE_DISPLAY_MS);
   }
 
   async function startGame() {
@@ -162,12 +163,11 @@ export default function RhythmGame() {
     // 状態初期化
     stateRef.current = createGameState();
     notesRef.current = [];
-    holdsRef.current = [];
     recentJudgesRef.current = [];
     noteIdRef.current = 0;
     finishedRef.current = false;
     phaseOffsetRef.current = 0;
-    refillHold();
+    cueIndexRef.current = -1;
 
     setPhase(PHASE.COUNTDOWN);
     runCountdown();
@@ -195,7 +195,6 @@ export default function RhythmGame() {
     const now = performance.now();
     startedAtRef.current = now;
     nextSpawnRef.current = now + 600;
-    lastCueAtRef.current = now;
     setPhase(PHASE.PLAYING);
     loop();
   }
@@ -205,17 +204,13 @@ export default function RhythmGame() {
     const st = stateRef.current;
     lastBpmRef.current = Math.round(bpm);
 
-    // 先頭の保留を消費（ハザード縞なら RUSH 確定）
-    const holdColor = holdsRef.current.shift() ?? HOLD.NONE;
-    const holdBonus = HOLD_BONUS[holdColor] ?? 0;
-    const forceRush = isConfirmedHold(holdColor);
-
-    const { judge: j, rushStarted } = applyHit(st, bpm, { holdBonus, forceRush });
+    const { judge: j, rushStarted } = applyHit(st, bpm);
 
     recentJudgesRef.current.push(j);
     if (recentJudgesRef.current.length > 40) recentJudgesRef.current.shift();
 
-    refillHold();
+    // コンボが伸びると救急車が流れる
+    updateCue(st.combo);
 
     // 判定表示・音
     setJudge({ type: j, key: Date.now() });
@@ -352,13 +347,9 @@ export default function RhythmGame() {
       // --- ノーツの生成と移動 ---
       const laneW = laneRef.current?.clientWidth ?? 600;
       while (nextSpawnRef.current < now + TRAVEL_MS) {
-        // 保留 i 番目 ＝ i 番目に到達するノーツ。
-        // NEXT の並びがそのまま「これから来るノーツ」になるようにする
-        const q = holdsRef.current;
-        const pending = notesRef.current.filter((n) => n.hitAt > now).length;
-        const color = st.isRush
-          ? HOLD.CONFIRM
-          : (q[Math.min(pending, q.length - 1)] ?? HOLD.NONE);
+        // ノーツの見た目はゲーム状態から決まる（抽選しない）
+        //   通常 → 赤 ／ RUSH 間近 → アンバー ／ RUSH 中 → ハザード縞
+        const color = st.isRush ? 'rush' : (st.gauge >= 85 ? 'near' : 'normal');
         notesRef.current.push({
           id: noteIdRef.current++,
           color,
@@ -374,19 +365,6 @@ export default function RhythmGame() {
         const x = HIT_X + (remain / TRAVEL_MS) * (laneW - HIT_X);
         return { ...n, x };
       }).filter((n) => n.x < laneW + 40);
-
-      // --- 予告演出の抽選 ---
-      if (!st.isRush && now - lastCueAtRef.current > CUE_COOLDOWN_MS) {
-        const momentum = calcMomentum(recentJudgesRef.current);
-        const picked = rollCue(st.gauge, momentum);
-        if (picked) {
-          lastCueAtRef.current = now;
-          setCue(picked);
-          sfx.playCue(CUE_INFO[picked].tier);
-          if (cueTimerRef.current) clearTimeout(cueTimerRef.current);
-          cueTimerRef.current = setTimeout(() => setCue(null), CUE_DISPLAY_MS);
-        }
-      }
 
       // --- HUD 更新（3フレームに1回に間引く） ---
       hudTick++;
@@ -523,13 +501,6 @@ export default function RhythmGame() {
             <span className="g-score-unit">pts</span>
           </div>
         </div>
-      </div>
-
-      {/* 保留 */}
-      <div className="g-hold">
-        <span className="cap" style={{ whiteSpace: 'nowrap' }}>NEXT</span>
-        {holds.map((c, i) => <span key={i} className={`g-hold-orb ${c}`} />)}
-        {holds.includes(HOLD.CONFIRM) && <span className="g-hold-hint">縞 = 確定</span>}
       </div>
 
       {/* 予告演出 / RUSH 帯 */}

@@ -62,10 +62,9 @@ export function calcHitPoints(judge, combo, isRush) {
   return (base + comboBonus) * (isRush ? RUSH_MULTIPLIER : 1);
 }
 
-/** チャンスゲージの増減量（保留の色が濃いほどボーナス） */
-export function calcGaugeDelta(judge, holdBonus = 0) {
-  const delta = GAUGE_DELTA[judge];
-  return delta > 0 ? delta + holdBonus : delta;
+/** チャンスゲージの増減量 */
+export function calcGaugeDelta(judge) {
+  return GAUGE_DELTA[judge];
 }
 
 /** ゲージを 0〜100 に収める */
@@ -96,7 +95,7 @@ export function createGameState() {
  * 1回の圧迫を状態に反映する（破壊的更新）
  * @returns {{ judge: string, points: number, rushStarted: boolean }}
  */
-export function applyHit(state, bpm, { holdBonus = 0, forceRush = false } = {}) {
+export function applyHit(state, bpm) {
   const judge = judgeBpm(bpm);
 
   if (judge === JUDGE.MISS) {
@@ -111,11 +110,11 @@ export function applyHit(state, bpm, { holdBonus = 0, forceRush = false } = {}) 
 
   const points = calcHitPoints(judge, state.combo, state.isRush);
   state.score += points;
-  state.gauge = clampGauge(state.gauge + calcGaugeDelta(judge, holdBonus));
+  state.gauge = clampGauge(state.gauge + calcGaugeDelta(judge));
 
-  // RUSH 突入判定（ゲージ満タン、または虹保留による確定）
+  // RUSH 突入判定（ゲージ満タンのみ。運の要素は入れない）
   let rushStarted = false;
-  if (!state.isRush && (state.gauge >= 100 || forceRush)) {
+  if (!state.isRush && state.gauge >= 100) {
     startRush(state);
     rushStarted = true;
   }

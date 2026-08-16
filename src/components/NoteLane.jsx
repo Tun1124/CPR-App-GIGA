@@ -15,13 +15,11 @@ export function PulseMark({ width = 20, color = '#3d0f09', strokeWidth = 2.2 }) 
   );
 }
 
-/** 段階ごとの、拍動マークの線の色（地の色に対して沈める） */
+/** 拍動マークの線の色（地の色に対して沈める） */
 const MARK_COLOR = {
-  none: '#2f2925',
-  low: '#3d0f09',
-  mid: '#3d0f09',
-  high: '#2b1b04',
-  confirm: '#2b1b04',
+  normal: '#3d0f09',
+  near: '#2b1b04',
+  rush: '#2b1b04',
 };
 
 /**
@@ -72,7 +70,7 @@ export default function NoteLane({ notes, laneRef, judge, burstKey }) {
           className={`g-note ${n.color}`}
           style={{ transform: `translate3d(${n.x}px, 0, 0) skewY(2.2deg)` }}
         >
-          <PulseMark color={MARK_COLOR[n.color] ?? '#2b2320'} />
+          <PulseMark color={MARK_COLOR[n.color] ?? '#3d0f09'} />
         </div>
       ))}
     </div>

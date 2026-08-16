@@ -385,24 +385,6 @@ body::before {
   margin-left: 3px;
 }
 
-/* 保留 */
-.g-hold { display: flex; align-items: center; gap: 5px; }
-.g-hold-orb { width: 12px; height: 12px; flex: none; }
-.g-hold-orb.none    { background: var(--line-2); }
-.g-hold-orb.low     { background: var(--red-deep); }
-.g-hold-orb.mid     { background: var(--red); width: 14px; height: 14px; }
-.g-hold-orb.high    { background: var(--amber); width: 15px; height: 15px; }
-.g-hold-orb.confirm { width: 17px; height: 17px;
-  background-image: repeating-linear-gradient(45deg, var(--amber) 0 6px, var(--ink) 6px 12px); }
-
-.g-hold-hint {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--amber);
-  white-space: nowrap;
-}
-
 /* ノーツレーン：枠を破って傾ける */
 .g-lane {
   position: relative;
@@ -464,12 +446,11 @@ body::before {
   justify-content: center;
   will-change: transform;
 }
-/* 通常ノーツも「叩く的」として確実に見えるだけの明度を持たせる */
-.g-note.none    { background: #8e8078; box-shadow: 3px 3px 0 #4a4139; }
-.g-note.low     { background: #b8392b; box-shadow: 3px 3px 0 #5e1a12; }
-.g-note.mid     { background: var(--red); box-shadow: 3px 3px 0 var(--red-shadow); }
-.g-note.high    { background: var(--amber); box-shadow: 3px 3px 0 var(--amber-deep); }
-.g-note.confirm { box-shadow: 3px 3px 0 var(--amber-deep);
+/* ノーツの見た目はゲーム状態から決まる（抽選しない）
+   通常 → 赤 ／ RUSH 間近 → アンバー ／ RUSH 中 → ハザード縞 */
+.g-note.normal { background: var(--red); box-shadow: 3px 3px 0 var(--red-shadow); }
+.g-note.near   { background: var(--amber); box-shadow: 3px 3px 0 var(--amber-deep); }
+.g-note.rush   { box-shadow: 3px 3px 0 var(--amber-deep);
   background-image: repeating-linear-gradient(45deg, var(--amber) 0 7px, #c8850f 7px 14px); }
 
 .g-note svg { display: block; }
