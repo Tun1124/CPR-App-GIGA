@@ -355,7 +355,6 @@ body::before {
   overflow: hidden;
   background: var(--ink);
 }
-.game-page.rush { background: #1b0f06; }
 
 /* 上部：計器の読み取り */
 .g-readout {
@@ -446,11 +445,11 @@ body::before {
   justify-content: center;
   will-change: transform;
 }
-/* ノーツの見た目はゲーム状態から決まる（抽選しない）
-   通常 → 赤 ／ RUSH 間近 → アンバー ／ RUSH 中 → ハザード縞 */
+/* ノーツの見た目はコンボから決まる（抽選しない）
+   〜24 → 赤 ／ 25〜79 → アンバー ／ 80〜 → ハザード縞 */
 .g-note.normal { background: var(--red); box-shadow: 3px 3px 0 var(--red-shadow); }
 .g-note.near   { background: var(--amber); box-shadow: 3px 3px 0 var(--amber-deep); }
-.g-note.rush   { box-shadow: 3px 3px 0 var(--amber-deep);
+.g-note.hot    { box-shadow: 3px 3px 0 var(--amber-deep);
   background-image: repeating-linear-gradient(45deg, var(--amber) 0 7px, #c8850f 7px 14px); }
 
 .g-note svg { display: block; }
@@ -501,7 +500,6 @@ body::before {
   color: var(--red);
   text-shadow: 4px 4px 0 var(--red-shadow);
 }
-.game-page.rush .g-combo-num { color: var(--amber); text-shadow: 4px 4px 0 var(--amber-deep); }
 
 .g-time {
   font-family: var(--font-mono);
@@ -509,22 +507,6 @@ body::before {
   font-size: 1.15rem;
   color: var(--paper);
   line-height: 1;
-}
-
-/* チャージゲージ：分割ブロック＋目盛り */
-.g-gauge-row { display: flex; align-items: center; gap: 8px; }
-.g-gauge { flex: 1; }
-.g-gauge-blocks { display: flex; gap: 2px; }
-.g-gauge-blocks span { flex: 1; height: 10px; background: var(--line); }
-.g-gauge-blocks span.on { background: var(--red); }
-.g-gauge-blocks span.hot { background: var(--amber); }
-.g-gauge-ticks { display: flex; justify-content: space-between; margin-top: 2px; }
-.g-gauge-ticks span { width: 1px; height: 3px; background: var(--line-2); }
-.g-gauge-val {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  color: var(--amber);
-  white-space: nowrap;
 }
 
 .g-mute {

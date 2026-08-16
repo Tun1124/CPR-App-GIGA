@@ -4,16 +4,12 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, Loader2, Volume2, VolumeX, CameraOff, PlayCircle } from 'lucide-react';
 import { globalPoseLandmarker, modelReady } from '../utils/mediapipe';
 import NoteLane from '../components/NoteLane';
-import { CueBanner, CutIn, RushBadge } from '../components/StageEffects';
+import { CueBanner, CutIn } from '../components/StageEffects';
 import {
   GAME_DURATION_MS, TARGET_BPM, JUDGE,
-  createGameState, applyHit, endRush, extendRush,
-  shouldContinueRush, calcRank, calcGameAdvice,
+  createGameState, applyHit, noteTier, calcRank, calcGameAdvice,
 } from '../utils/gameScoring';
-import {
-  CUE_INFO, nextCue, CUE_DISPLAY_MS,
-  rollRushOutro, OUTRO_STEPS, isMilestone,
-} from '../utils/effectDirector';
+import { CUE_INFO, nextCue, CUE_DISPLAY_MS, isMilestone } from '../utils/effectDirector';
 import * as sfx from '../utils/sound';
 
 const ELEMENTARY_SCHOOLS = [
@@ -25,7 +21,6 @@ const JUNIOR_SCHOOLS = ['犬山中学校', '城東中学校', '東部中学校',
 const BEAT_MS = 60000 / TARGET_BPM;   // ノーツ1個あたりの間隔
 const TRAVEL_MS = 2200;               // ノーツが右端から判定リングに届くまで
 const HIT_X = 52;                     // 判定リングの中心X
-const GAUGE_BLOCKS = 8;               // チャージゲージの分割数
 
 const PHASE = { SETUP: 'setup', COUNTDOWN: 'countdown', PLAYING: 'playing', DENIED: 'denied' };
 
@@ -48,7 +43,7 @@ export default function RhythmGame() {
 
   // HUD 表示用（毎フレームではなく間引いて更新する）
   const [hud, setHud] = useState({
-    score: 0, combo: 0, gauge: 0, bpm: 0, isRush: false, rushRemain: 0, remainSec: 120,
+    score: 0, combo: 0, bpm: 0, remainSec: 120,
   });
   const [notes, setNotes] = useState([]);
   const [judge, setJudge] = useState(null);
@@ -204,7 +199,7 @@ export default function RhythmGame() {
     const st = stateRef.current;
     lastBpmRef.current = Math.round(bpm);
 
-    const { judge: j, rushStarted } = applyHit(st, bpm);
+    const { judge: j } = applyHit(st, bpm);
 
     recentJudgesRef.current.push(j);
     if (recentJudgesRef.current.length > 40) recentJudgesRef.current.shift();
@@ -226,28 +221,6 @@ export default function RhythmGame() {
       sfx.playMilestone();
       showCutinSteps([{ text: `${st.combo} COMBO!!`, ms: 1100, tone: 'gold' }]);
     }
-
-    // RUSH 突入
-    if (rushStarted) {
-      sfx.playRushStart();
-      showCutinSteps([{ text: '救命RUSH!!', ms: 1500, tone: 'gold' }]);
-    }
-  }
-
-  /** RUSH 終了処理（継続は実力で決まる） */
-  function handleRushEnd() {
-    const st = stateRef.current;
-    const continues = shouldContinueRush(recentJudgesRef.current);
-    const outro = rollRushOutro(continues);
-    showCutinSteps(OUTRO_STEPS[outro]);
-
-    if (continues) {
-      extendRush(st);
-      sfx.playContinue();
-    } else {
-      endRush(st);
-      sfx.playRushEnd();
-    }
   }
 
   function finish() {
@@ -266,7 +239,6 @@ export default function RhythmGame() {
         goodCount: st.goodCount,
         okCount: st.okCount,
         missCount: st.missCount,
-        rushCount: st.rushCount,
         rank: calcRank(st),
         advice: calcGameAdvice(st),
         school, className, studentNum, schoolType,
@@ -341,18 +313,14 @@ export default function RhythmGame() {
         }
       }
 
-      // --- RUSH の残り時間 ---
-      if (st.isRush && now >= st.rushEndsAt) handleRushEnd();
-
       // --- ノーツの生成と移動 ---
       const laneW = laneRef.current?.clientWidth ?? 600;
       while (nextSpawnRef.current < now + TRAVEL_MS) {
-        // ノーツの見た目はゲーム状態から決まる（抽選しない）
-        //   通常 → 赤 ／ RUSH 間近 → アンバー ／ RUSH 中 → ハザード縞
-        const color = st.isRush ? 'rush' : (st.gauge >= 85 ? 'near' : 'normal');
+        // ノーツの見た目はコンボから決まる（抽選しない）
+        //   〜24 → 赤 ／ 25〜79 → アンバー ／ 80〜 → ハザード縞
         notesRef.current.push({
           id: noteIdRef.current++,
-          color,
+          color: noteTier(st.combo),
           hitAt: nextSpawnRef.current,
         });
         nextSpawnRef.current += BEAT_MS;
@@ -373,10 +341,7 @@ export default function RhythmGame() {
         setHud({
           score: st.score,
           combo: st.combo,
-          gauge: st.gauge,
           bpm: lastBpmRef.current,
-          isRush: st.isRush,
-          rushRemain: st.isRush ? Math.max(0, Math.ceil((st.rushEndsAt - now) / 1000)) : 0,
           remainSec: Math.max(0, Math.ceil((GAME_DURATION_MS - elapsed) / 1000)),
         });
       }
@@ -484,10 +449,8 @@ export default function RhythmGame() {
   }
 
   // ---------- プレイ画面 ----------
-  const gaugeBlocks = Math.round((hud.gauge / 100) * GAUGE_BLOCKS);
-
   return (
-    <div className={`game-page ${hud.isRush ? 'rush' : ''}`}>
+    <div className="game-page">
       {/* 上段：計器の読み取り */}
       <div className="g-readout">
         <div className="g-tempo brk">
@@ -503,10 +466,8 @@ export default function RhythmGame() {
         </div>
       </div>
 
-      {/* 予告演出 / RUSH 帯 */}
-      {hud.isRush
-        ? <RushBadge isRush remainSec={hud.rushRemain} />
-        : <CueBanner cue={cue} />}
+      {/* 予告演出 */}
+      <CueBanner cue={cue} />
 
       {/* ノーツレーン */}
       <NoteLane notes={notes} laneRef={laneRef} judge={judge} burstKey={burstKey} />
@@ -525,32 +486,15 @@ export default function RhythmGame() {
           </motion.span>
           <span className="cap">COMBO</span>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="cap">TIME</div>
-          <div className="g-time">{mm}:{ss}</div>
-        </div>
-      </div>
-
-      {/* チャージゲージ */}
-      <div className="g-gauge-row">
-        <span className="cap" style={{ whiteSpace: 'nowrap' }}>CHARGE</span>
-        <div className="g-gauge">
-          <div className="g-gauge-blocks">
-            {Array.from({ length: GAUGE_BLOCKS }, (_, i) => (
-              <span
-                key={i}
-                className={i < gaugeBlocks ? (i >= GAUGE_BLOCKS - 3 ? 'hot' : 'on') : ''}
-              />
-            ))}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div className="cap">TIME</div>
+            <div className="g-time">{mm}:{ss}</div>
           </div>
-          <div className="g-gauge-ticks">
-            {Array.from({ length: 5 }, (_, i) => <span key={i} />)}
-          </div>
+          <button className="g-mute" onClick={toggleMute} aria-label={muted ? '音を出す' : '音を消す'}>
+            {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+          </button>
         </div>
-        <span className="g-gauge-val">{gaugeBlocks}/{GAUGE_BLOCKS}</span>
-        <button className="g-mute" onClick={toggleMute} aria-label={muted ? '音を出す' : '音を消す'}>
-          {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-        </button>
       </div>
 
       {/* カメラサムネイル */}

@@ -170,7 +170,7 @@ function GameResult({ state }) {
 
   const {
     gameScore = 0, maxCombo = 0, goodCount = 0, okCount = 0, missCount = 0,
-    rushCount = 0, rank, advice = [],
+    rank, advice = [],
     school = '', className = '', studentNum = '', schoolType = 'elementary',
   } = state;
 
@@ -182,7 +182,7 @@ function GameResult({ state }) {
     sentRef.current = true;
     postScore({
       mode: 'game',
-      gameScore, maxCombo, goodCount, okCount, missCount, rushCount,
+      gameScore, maxCombo, goodCount, okCount, missCount,
       rank: rank?.tier ?? '',
       school, className, studentNum, schoolType,
       timestamp: new Date().toISOString(),
@@ -234,10 +234,6 @@ function GameResult({ state }) {
         <div className="row">
           <span className="row-label">MAX COMBO</span>
           <span className="row-value good">{maxCombo}</span>
-        </div>
-        <div className="row">
-          <span className="row-label">救命RUSH</span>
-          <span className="row-value red">{rushCount} 回</span>
         </div>
         <div className="row">
           <span className="row-label">良</span>

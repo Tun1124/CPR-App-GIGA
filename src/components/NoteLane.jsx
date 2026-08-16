@@ -19,7 +19,7 @@ export function PulseMark({ width = 20, color = '#3d0f09', strokeWidth = 2.2 }) 
 const MARK_COLOR = {
   normal: '#3d0f09',
   near: '#2b1b04',
-  rush: '#2b1b04',
+  hot: '#2b1b04',
 };
 
 /**

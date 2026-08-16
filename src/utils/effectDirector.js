@@ -53,29 +53,6 @@ export function nextCue(combo, lastIndex) {
 /** 予告演出の表示時間（ミリ秒） */
 export const CUE_DISPLAY_MS = 2600;
 
-/**
- * RUSH 終了時の演出パターンを決める。
- * 継続するかどうかは実力（continues）で既に決まっており、
- * ここで選ぶのは「どう見せるか」だけ。
- */
-export function rollRushOutro(continues) {
-  if (continues) {
-    // 3回に1回は「終了…」と見せてから復活させる
-    return Math.random() < 0.35 ? 'revive' : 'continue';
-  }
-  return 'end';
-}
-
-/** RUSH 終了演出のセリフ */
-export const OUTRO_STEPS = {
-  continue: [{ text: '継続！', ms: 1400, tone: 'gold' }],
-  revive: [
-    { text: '終了…', ms: 1100, tone: 'dim' },
-    { text: '復活！！', ms: 1500, tone: 'gold' },
-  ],
-  end: [{ text: 'RUSH 終了', ms: 1200, tone: 'dim' }],
-};
-
 /** コンボの節目（全画面演出を出す） */
 export const MILESTONES = [50, 100, 150, 200];
 

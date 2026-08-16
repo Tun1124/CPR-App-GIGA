@@ -142,26 +142,6 @@ export function playCue(tier = 1) {
   }
 }
 
-/** RUSH 突入 */
-export function playRushStart() {
-  [392, 523, 659, 784, 1047, 1319].forEach((f, i) =>
-    tone({ freq: f, duration: 0.22, type: 'square', gain: 0.34, delay: i * 0.07 })
-  );
-  noiseBurst(0.25, 0.4);
-}
-
-/** RUSH 継続 */
-export function playContinue() {
-  [659, 880, 1047].forEach((f, i) =>
-    tone({ freq: f, duration: 0.2, type: 'triangle', gain: 0.36, delay: i * 0.08 })
-  );
-}
-
-/** RUSH 終了 */
-export function playRushEnd() {
-  tone({ freq: 440, slideTo: 220, duration: 0.5, type: 'sine', gain: 0.25 });
-}
-
 /** コンボの節目 */
 export function playMilestone() {
   [784, 988, 1175].forEach((f, i) =>

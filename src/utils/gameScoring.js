@@ -1,5 +1,5 @@
 // =============================================
-// PUSH BEAT — 判定・コンボ・チャンスゲージ・スコア
+// PUSH BEAT — 判定・コンボ・スコア
 // 解析ロジック（仕様書§3）とは完全分離
 // 既存 scoring.js（ビデオ評価の減点方式）にも影響しない
 // =============================================
@@ -9,12 +9,6 @@ export const GAME_DURATION_MS = 120000;
 
 /** 目標テンポ（ノーツの流れる速さ） */
 export const TARGET_BPM = 110;
-
-/** RUSH の継続時間（ミリ秒） */
-export const RUSH_DURATION_MS = 20000;
-
-/** RUSH 中の得点倍率 */
-export const RUSH_MULTIPLIER = 5;
 
 /** 判定の種類 */
 export const JUDGE = {
@@ -35,11 +29,16 @@ const BASE_POINT = {
   [JUDGE.MISS]: 0,
 };
 
-const GAUGE_DELTA = {
-  [JUDGE.GOOD]: 1.5,
-  [JUDGE.OK]: 0.7,
-  [JUDGE.MISS]: -2.5,
-};
+/** コンボ1につき加算される点数 */
+const COMBO_STEP = 10;
+
+/**
+ * ノーツの見た目が変わるコンボ数。
+ * 予告演出（救急車）の節目と揃えてあるため、
+ * 「演出が出る」と「ノーツが熱くなる」が同時に起きる。
+ */
+export const NOTE_TIER_NEAR = 25;
+export const NOTE_TIER_HOT = 80;
 
 /**
  * 瞬間BPMから判定を返す
@@ -53,23 +52,12 @@ export function judgeBpm(bpm) {
 
 /**
  * 1回の圧迫で得られる点数
- * 獲得点 = (基礎点 + min(コンボ, 100) × 10) × 倍率
+ *   獲得点 = 基礎点 + コンボ × 10
+ * コンボ補正に上限はない。続けるほど1回の価値が上がる。
  */
-export function calcHitPoints(judge, combo, isRush) {
+export function calcHitPoints(judge, combo) {
   if (judge === JUDGE.MISS) return 0;
-  const base = BASE_POINT[judge];
-  const comboBonus = Math.min(combo, 100) * 10;
-  return (base + comboBonus) * (isRush ? RUSH_MULTIPLIER : 1);
-}
-
-/** チャンスゲージの増減量 */
-export function calcGaugeDelta(judge) {
-  return GAUGE_DELTA[judge];
-}
-
-/** ゲージを 0〜100 に収める */
-export function clampGauge(v) {
-  return Math.max(0, Math.min(100, v));
+  return BASE_POINT[judge] + combo * COMBO_STEP;
 }
 
 /**
@@ -81,19 +69,15 @@ export function createGameState() {
     score: 0,
     combo: 0,
     maxCombo: 0,
-    gauge: 0,
     goodCount: 0,
     okCount: 0,
     missCount: 0,
-    rushCount: 0,
-    isRush: false,
-    rushEndsAt: 0,
   };
 }
 
 /**
  * 1回の圧迫を状態に反映する（破壊的更新）
- * @returns {{ judge: string, points: number, rushStarted: boolean }}
+ * @returns {{ judge: string, points: number }}
  */
 export function applyHit(state, bpm) {
   const judge = judgeBpm(bpm);
@@ -108,63 +92,37 @@ export function applyHit(state, bpm) {
     else state.okCount++;
   }
 
-  const points = calcHitPoints(judge, state.combo, state.isRush);
+  const points = calcHitPoints(judge, state.combo);
   state.score += points;
-  state.gauge = clampGauge(state.gauge + calcGaugeDelta(judge));
 
-  // RUSH 突入判定（ゲージ満タンのみ。運の要素は入れない）
-  let rushStarted = false;
-  if (!state.isRush && state.gauge >= 100) {
-    startRush(state);
-    rushStarted = true;
-  }
-
-  return { judge, points, rushStarted };
+  return { judge, points };
 }
 
-/** RUSH を開始する */
-export function startRush(state, now = performance.now()) {
-  state.isRush = true;
-  state.rushCount++;
-  state.gauge = 0;
-  state.rushEndsAt = now + RUSH_DURATION_MS;
-}
-
-/** RUSH を延長する（継続演出） */
-export function extendRush(state, now = performance.now()) {
-  state.rushCount++;
-  state.rushEndsAt = now + RUSH_DURATION_MS;
-}
-
-/** RUSH を終了する */
-export function endRush(state) {
-  state.isRush = false;
-  state.rushEndsAt = 0;
-}
-
-/**
- * RUSH 継続の可否を実力で判定する
- * 直近のリズムが安定していれば継続（運任せにしない）
- */
-export function shouldContinueRush(recentJudges) {
-  if (recentJudges.length < 8) return false;
-  const window = recentJudges.slice(-12);
-  const hits = window.filter((j) => j !== JUDGE.MISS).length;
-  return hits / window.length >= 0.75;
+/** コンボに応じたノーツの見た目 */
+export function noteTier(combo) {
+  if (combo >= NOTE_TIER_HOT) return 'hot';
+  if (combo >= NOTE_TIER_NEAR) return 'near';
+  return 'normal';
 }
 
 /**
  * 終了ランクを判定する
- * 特級（フルコンボ）／一級／二級／三級／修了
+ * 特級（ノーミス）／一級／二級／三級／修了
+ *
+ * しきい値は実測で決めている（2分・約220回の想定）:
+ *   理論最大（全て良）  約 309,000
+ *   精度97%            約 90,000〜209,000
+ *   精度80%            約  54,000〜 68,000
+ *   精度45%            約  26,000〜 33,000
  */
 export function calcRank(state) {
   const totalHits = state.goodCount + state.okCount;
   if (state.missCount === 0 && totalHits >= 30) {
     return { tier: 'perfect', label: '特級', name: 'ノーミス達成', color: '#f5a623' };
   }
-  if (state.score >= 300000) return { tier: 'first', label: '一級', name: '極めて優秀', color: '#f5a623' };
-  if (state.score >= 150000) return { tier: 'second', label: '二級', name: '優秀', color: '#e03a2b' };
-  if (state.score >= 50000) return { tier: 'third', label: '三級', name: '良好', color: '#f2ede6' };
+  if (state.score >= 150000) return { tier: 'first', label: '一級', name: '極めて優秀', color: '#f5a623' };
+  if (state.score >= 80000) return { tier: 'second', label: '二級', name: '優秀', color: '#e03a2b' };
+  if (state.score >= 35000) return { tier: 'third', label: '三級', name: '良好', color: '#f2ede6' };
   return { tier: 'clear', label: '修了', name: '完走', color: '#8c8076' };
 }
 
@@ -176,7 +134,7 @@ export function calcGameAdvice(state) {
     advice.push('テンポが安定していません。1分間に100〜120回の一定のリズムを意識しましょう。');
   }
   if (state.maxCombo < 20) {
-    advice.push('連続して同じ速さで押し続けると、コンボが伸びて得点が大きく上がります。');
+    advice.push('連続して同じ速さで押し続けると、コンボが伸びて1回あたりの点が大きく上がります。');
   }
   if (advice.length === 0) {
     advice.push('とても安定したリズムです。この感覚を覚えておきましょう。');

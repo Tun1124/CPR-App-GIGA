@@ -44,7 +44,7 @@ export function CueBanner({ cue }) {
   );
 }
 
-/** 全画面カットイン（コンボの節目・RUSH 突入・継続/復活） */
+/** 全画面カットイン（コンボの節目） */
 export function CutIn({ cutin }) {
   return (
     <AnimatePresence>
@@ -72,20 +72,3 @@ export function CutIn({ cutin }) {
   );
 }
 
-/** RUSH 中の帯 */
-export function RushBadge({ isRush, remainSec }) {
-  if (!isRush) return null;
-  return (
-    <motion.div
-      className="g-banner t4"
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.18 }}
-    >
-      <span className="font-display" style={{ fontSize: '1rem', color: '#f5a623' }}>
-        救命RUSH ×5
-      </span>
-      <span className="g-badge">あと {remainSec}秒</span>
-    </motion.div>
-  );
-}
