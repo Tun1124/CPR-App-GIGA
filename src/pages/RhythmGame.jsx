@@ -562,7 +562,7 @@ export default function RhythmGame() {
       </div>
 
       {/* カメラサムネイル */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
+      <div className="g-cam-row">
         <div className="g-cam">
           <video ref={videoRef} playsInline muted />
         </div>
