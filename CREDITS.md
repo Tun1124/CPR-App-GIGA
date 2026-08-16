@@ -17,8 +17,9 @@
 
 | 名称 | 用途 | 入手元 | ライセンス | 取得日 |
 |---|---|---|---|---|
-| Dela Gothic One | 見出し・数字（SCORE / COMBO / 判定） | https://fonts.google.com/specimen/Dela+Gothic+One | SIL Open Font License 1.1 | 2026-08-16 |
+| Dela Gothic One | 見出し・掛け声（SCORE / COMBO / 判定） | https://fonts.google.com/specimen/Dela+Gothic+One | SIL Open Font License 1.1 | 2026-08-16 |
 | Noto Sans JP | 本文・UI | https://fonts.google.com/noto/specimen/Noto+Sans+JP | SIL Open Font License 1.1 | 2026-08-16 |
+| Roboto Mono | 計測値・ラベル（TEMPO / TIME / 内訳） | https://fonts.google.com/specimen/Roboto+Mono | Apache License 2.0 | 2026-08-17 |
 
 いずれも Google Fonts 経由で読み込み（`index.html`）。商用利用可・再配布可。
 

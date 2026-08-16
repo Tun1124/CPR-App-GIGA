@@ -9,22 +9,25 @@
 
 import { JUDGE } from './gameScoring';
 
-/** 保留（NEXT）の色。右にいくほど信頼度が高い */
+/**
+ * 保留（NEXT）の段階。下にいくほど信頼度が高い。
+ * 見た目は 灰 → 深赤 → 赤 → アンバー → ハザード縞 の順に熱くなる。
+ */
 export const HOLD = {
-  WHITE: 'white',
-  BLUE: 'blue',
-  GREEN: 'green',
-  RED: 'red',
-  RAINBOW: 'rainbow',
+  NONE: 'none',       // 通常
+  LOW: 'low',         // 微アツ
+  MID: 'mid',         // アツい
+  HIGH: 'high',       // 激アツ
+  CONFIRM: 'confirm', // 確定（ハザード縞）
 };
 
-/** 保留の色ごとのチャンスゲージ加算ボーナス */
+/** 段階ごとのチャンスゲージ加算ボーナス */
 export const HOLD_BONUS = {
-  [HOLD.WHITE]: 0,
-  [HOLD.BLUE]: 0.3,
-  [HOLD.GREEN]: 0.7,
-  [HOLD.RED]: 1.4,
-  [HOLD.RAINBOW]: 3.0,
+  [HOLD.NONE]: 0,
+  [HOLD.LOW]: 0.3,
+  [HOLD.MID]: 0.7,
+  [HOLD.HIGH]: 1.4,
+  [HOLD.CONFIRM]: 3.0,
 };
 
 /** 保留の本数 */
@@ -36,7 +39,7 @@ export const CUE = {
   AMBULANCE: 'ambulance',
   FLEET: 'fleet',
   HELI: 'heli',
-  RAINBOW_BG: 'rainbowBg',
+  ALERT: 'alert',
 };
 
 export const CUE_INFO = {
@@ -44,7 +47,7 @@ export const CUE_INFO = {
   [CUE.AMBULANCE]:  { tier: 2, text: '救急車が向かっている', badge: 'アツい',   icon: 'ambulance' },
   [CUE.FLEET]:      { tier: 3, text: '救急車の群れ！',      badge: '激アツ',   icon: 'fleet' },
   [CUE.HELI]:       { tier: 4, text: 'ドクターヘリ出動！！', badge: '超激アツ', icon: 'heli' },
-  [CUE.RAINBOW_BG]: { tier: 4, text: '虹――',              badge: '確定',     icon: 'rainbow' },
+  [CUE.ALERT]:      { tier: 4, text: '全隊 出動！！',      badge: '確定',     icon: 'alert' },
 };
 
 /**
@@ -62,17 +65,17 @@ export function calcMomentum(recentJudges) {
   return Math.min(1, point / window.length);
 }
 
-/** 虹保留（RUSH 確定）が出現できるチャンスゲージの下限 */
-export const RAINBOW_GAUGE_MIN = 75;
+/** ハザード縞の保留（RUSH 確定）が出現できるチャンスゲージの下限 */
+export const CONFIRM_GAUGE_MIN = 75;
 
 /**
- * 次の保留の色を抽選する。
- * 調子が良いほど上位の色が出やすい（運だけで虹は出ない）。
+ * 次の保留の段階を抽選する。
+ * 調子が良いほど上位の段階が出やすい（運だけで確定は出ない）。
  *
- * 虹（RUSH確定）は「ゲージが十分溜まっている」ときにしか出さない。
- * こうすることで「虹＝確定」という演出の約束を守りつつ、
+ * 確定（ハザード縞）は「ゲージが十分溜まっている」ときにしか出さない。
+ * こうすることで「縞＝確定」という演出の約束を守りつつ、
  * RUSH に入れるかどうかは実力（ゲージの積み上げ）で決まるようにしている。
- * 虹をいつでも抽選対象にすると、運だけでスコアが数倍ブレてランキングが壊れる。
+ * 確定をいつでも抽選対象にすると、運だけでスコアが数倍ブレてランキングが壊れる。
  */
 export function rollHoldColor(momentum, combo, gauge = 0) {
   // 調子と現在のコンボから「熱さ」を決める
@@ -81,29 +84,29 @@ export function rollHoldColor(momentum, combo, gauge = 0) {
   // 熱さが低いうちは上位色を抽選対象にしない
   const r = Math.random();
   if (heat >= 0.9) {
-    if (r < 0.1 && gauge >= RAINBOW_GAUGE_MIN) return HOLD.RAINBOW;
-    if (r < 0.4) return HOLD.RED;
-    if (r < 0.7) return HOLD.GREEN;
-    return HOLD.BLUE;
+    if (r < 0.1 && gauge >= CONFIRM_GAUGE_MIN) return HOLD.CONFIRM;
+    if (r < 0.4) return HOLD.HIGH;
+    if (r < 0.7) return HOLD.MID;
+    return HOLD.LOW;
   }
   if (heat >= 0.7) {
-    if (r < 0.12) return HOLD.RED;
-    if (r < 0.42) return HOLD.GREEN;
-    if (r < 0.75) return HOLD.BLUE;
-    return HOLD.WHITE;
+    if (r < 0.12) return HOLD.HIGH;
+    if (r < 0.42) return HOLD.MID;
+    if (r < 0.75) return HOLD.LOW;
+    return HOLD.NONE;
   }
   if (heat >= 0.45) {
-    if (r < 0.1) return HOLD.GREEN;
-    if (r < 0.4) return HOLD.BLUE;
-    return HOLD.WHITE;
+    if (r < 0.1) return HOLD.MID;
+    if (r < 0.4) return HOLD.LOW;
+    return HOLD.NONE;
   }
-  if (r < 0.15) return HOLD.BLUE;
-  return HOLD.WHITE;
+  if (r < 0.15) return HOLD.LOW;
+  return HOLD.NONE;
 }
 
-/** 虹保留は RUSH 突入確定 */
+/** ハザード縞の保留は RUSH 突入確定 */
 export function isConfirmedHold(color) {
-  return color === HOLD.RAINBOW;
+  return color === HOLD.CONFIRM;
 }
 
 /**

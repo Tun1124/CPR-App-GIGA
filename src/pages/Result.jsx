@@ -191,58 +191,78 @@ function GameResult({ state }) {
 
   // 上位ランクは紙吹雪
   useEffect(() => {
-    if (rank?.tier === 'rainbow') {
+    if (rank?.tier === 'perfect') {
       confetti({ particleCount: 240, spread: 100, origin: { y: 0.5 } });
-    } else if (rank?.tier === 'gold') {
+    } else if (rank?.tier === 'first') {
       confetti({ particleCount: 140, spread: 80, origin: { y: 0.5 } });
     }
   }, []);
 
   const total = goodCount + okCount + missCount;
+  const pct = (n) => (total ? (n / total) * 100 : 0);
 
   return (
-    <div className="page result-page game-result">
+    <div className="page result-page">
+      {/* スコア表 */}
       <motion.div
-        className="score-card game-card"
-        initial={{ scale: 0.75, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 180, damping: 18 }}
-      >
-        <span className="font-display" style={{ fontSize: '2.6rem', color: rank?.color }}>
-          {rank?.label}
-        </span>
-        <motion.span
-          className="font-display"
-          style={{ fontSize: '3rem', color: '#fff', lineHeight: 1 }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {gameScore.toLocaleString()}
-        </motion.span>
-        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: rank?.color }}>
-          {rank?.name}
-        </span>
-      </motion.div>
-
-      <motion.div
-        className="breakdown"
-        initial={{ opacity: 0, y: 20 }}
+        className="sheet"
+        initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 22 }}
       >
-        <div className="breakdown-item ok">
-          <span className="breakdown-label">最大コンボ</span>
-          <span className="breakdown-value">{maxCombo}</span>
+        <div className="sheet-head">
+          <span className="sheet-title">訓練結果</span>
+          <span className="cap">{school} {className} {studentNum}番</span>
         </div>
-        <div className="breakdown-item neutral">
-          <span className="breakdown-label">救命RUSH</span>
-          <span className="breakdown-value">{rushCount} 回</span>
+
+        <div className="sheet-total">
+          <div className="cap">TOTAL SCORE</div>
+          <motion.div
+            className="sheet-total-num"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
+          >
+            {gameScore.toLocaleString()}
+          </motion.div>
         </div>
-        <div className="breakdown-item ok">
-          <span className="breakdown-label">良 / 可 / 不可</span>
-          <span className="breakdown-value">{goodCount} / {okCount} / {missCount}</span>
-          <span className="breakdown-detail">全 {total} 回の圧迫</span>
+
+        <div className="row">
+          <span className="row-label">評価</span>
+          <span className="rank-chip" style={{ color: rank?.color }}>{rank?.label}</span>
+        </div>
+        <div className="row">
+          <span className="row-label">MAX COMBO</span>
+          <span className="row-value good">{maxCombo}</span>
+        </div>
+        <div className="row">
+          <span className="row-label">救命RUSH</span>
+          <span className="row-value red">{rushCount} 回</span>
+        </div>
+        <div className="row">
+          <span className="row-label">良</span>
+          <span className="row-value good">{goodCount}</span>
+        </div>
+        <div className="row">
+          <span className="row-label">可</span>
+          <span className="row-value">{okCount}</span>
+        </div>
+        <div className="row">
+          <span className="row-label">不可</span>
+          <span className="row-value" style={{ color: 'var(--dim)' }}>{missCount}</span>
+        </div>
+
+        {/* 判定の内訳バー */}
+        <div className="row" style={{ display: 'block' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span className="row-label">内訳</span>
+            <span className="row-label">全 {total} 回</span>
+          </div>
+          <div className="tally">
+            <span className="t-good" style={{ width: `${pct(goodCount)}%` }} />
+            <span className="t-ok" style={{ width: `${pct(okCount)}%` }} />
+            <span className="t-miss" style={{ width: `${pct(missCount)}%` }} />
+          </div>
         </div>
       </motion.div>
 
@@ -251,7 +271,7 @@ function GameResult({ state }) {
           className="advice-box"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.45 }}
         >
           <p className="advice-title">上達のヒント</p>
           {advice.map((a, i) => <p key={i} className="advice-text">• {a}</p>)}
@@ -260,13 +280,15 @@ function GameResult({ state }) {
 
       <div className="result-actions">
         <button className="btn btn-game" onClick={() => navigate('/game')}>
-          <Zap size={20} /> もう一度挑戦する
+          <span className="btn-label"><Zap size={19} /> もう一度挑戦する</span>
+          <span className="btn-num">RETRY</span>
         </button>
         <button className="btn btn-secondary" onClick={() => navigate('/ranking')}>
-          <Trophy size={20} /> ランキングを見る
+          <span className="btn-label"><Trophy size={19} /> 記録と順位</span>
+          <span className="btn-num">03</span>
         </button>
         <button className="btn btn-outline" onClick={() => navigate('/')}>
-          <Home size={20} /> ホームへ
+          <span className="btn-label"><Home size={19} /> ホームへ</span>
         </button>
       </div>
     </div>

@@ -26,7 +26,8 @@ const JUNIOR_SCHOOLS = ['犬山中学校', '城東中学校', '東部中学校',
 
 const BEAT_MS = 60000 / TARGET_BPM;   // ノーツ1個あたりの間隔
 const TRAVEL_MS = 2200;               // ノーツが右端から判定リングに届くまで
-const HIT_X = 48;                     // 判定リングの中心X
+const HIT_X = 52;                     // 判定リングの中心X
+const GAUGE_BLOCKS = 8;               // チャージゲージの分割数
 
 const PHASE = { SETUP: 'setup', COUNTDOWN: 'countdown', PLAYING: 'playing', DENIED: 'denied' };
 
@@ -49,7 +50,7 @@ export default function RhythmGame() {
 
   // HUD 表示用（毎フレームではなく間引いて更新する）
   const [hud, setHud] = useState({
-    score: 0, combo: 0, gauge: 0, isRush: false, rushRemain: 0, remainSec: 120,
+    score: 0, combo: 0, gauge: 0, bpm: 0, isRush: false, rushRemain: 0, remainSec: 120,
   });
   const [notes, setNotes] = useState([]);
   const [holds, setHolds] = useState([]);
@@ -71,6 +72,7 @@ export default function RhythmGame() {
   const cutinTimerRef = useRef([]);
   const phaseOffsetRef = useRef(0);   // ノーツの位相（プレイヤーに追従させる）
   const finishedRef = useRef(false);
+  const lastBpmRef = useRef(0);       // 直近の瞬間BPM（表示用）
 
   // モデル読み込み監視
   useEffect(() => {
@@ -201,9 +203,10 @@ export default function RhythmGame() {
   /** 圧迫を1回検知したときの処理 */
   function onCompression(bpm) {
     const st = stateRef.current;
+    lastBpmRef.current = Math.round(bpm);
 
-    // 先頭の保留を消費（虹なら RUSH 確定）
-    const holdColor = holdsRef.current.shift() ?? HOLD.WHITE;
+    // 先頭の保留を消費（ハザード縞なら RUSH 確定）
+    const holdColor = holdsRef.current.shift() ?? HOLD.NONE;
     const holdBonus = HOLD_BONUS[holdColor] ?? 0;
     const forceRush = isConfirmedHold(holdColor);
 
@@ -349,7 +352,13 @@ export default function RhythmGame() {
       // --- ノーツの生成と移動 ---
       const laneW = laneRef.current?.clientWidth ?? 600;
       while (nextSpawnRef.current < now + TRAVEL_MS) {
-        const color = st.isRush ? 'rainbow' : (holdsRef.current[0] ?? HOLD.WHITE);
+        // 保留 i 番目 ＝ i 番目に到達するノーツ。
+        // NEXT の並びがそのまま「これから来るノーツ」になるようにする
+        const q = holdsRef.current;
+        const pending = notesRef.current.filter((n) => n.hitAt > now).length;
+        const color = st.isRush
+          ? HOLD.CONFIRM
+          : (q[Math.min(pending, q.length - 1)] ?? HOLD.NONE);
         notesRef.current.push({
           id: noteIdRef.current++,
           color,
@@ -387,6 +396,7 @@ export default function RhythmGame() {
           score: st.score,
           combo: st.combo,
           gauge: st.gauge,
+          bpm: lastBpmRef.current,
           isRush: st.isRush,
           rushRemain: st.isRush ? Math.max(0, Math.ceil((st.rushEndsAt - now) / 1000)) : 0,
           remainSec: Math.max(0, Math.ceil((GAME_DURATION_MS - elapsed) / 1000)),
@@ -414,10 +424,11 @@ export default function RhythmGame() {
           「ビデオで評価する」なら、撮影済みの動画でも判定できます。
         </p>
         <button className="btn btn-primary" onClick={() => navigate('/evaluate')}>
-          ビデオで評価する
+          <span className="btn-label">ビデオで評価する</span>
+          <span className="btn-num">02</span>
         </button>
         <button className="btn btn-outline" onClick={() => navigate('/')}>
-          ホームへ
+          <span className="btn-label">ホームへ</span>
         </button>
       </div>
     );
@@ -476,9 +487,17 @@ export default function RhythmGame() {
           onClick={startGame}
           disabled={!modelLoaded}
         >
-          {modelLoaded
-            ? <><PlayCircle size={20} /> スタート</>
-            : <><Loader2 size={20} className="spin" /> AIモデルを準備中...</>}
+          {modelLoaded ? (
+            <>
+              <span className="btn-label"><PlayCircle size={19} /> 訓練を開始する</span>
+              <span className="btn-num">START</span>
+            </>
+          ) : (
+            <>
+              <span className="btn-label"><Loader2 size={19} className="spin" /> AIモデルを準備中</span>
+              <span className="btn-num">WAIT</span>
+            </>
+          )}
         </motion.button>
 
         <video ref={videoRef} playsInline muted style={{ display: 'none' }} />
@@ -487,28 +506,30 @@ export default function RhythmGame() {
   }
 
   // ---------- プレイ画面 ----------
+  const gaugeBlocks = Math.round((hud.gauge / 100) * GAUGE_BLOCKS);
+
   return (
     <div className={`game-page ${hud.isRush ? 'rush' : ''}`}>
-      <div className="g-blob a" />
-      <div className="g-blob b" />
+      {/* 上段：計器の読み取り */}
+      <div className="g-readout">
+        <div className="g-tempo brk">
+          <div className="cap">TEMPO</div>
+          <div className="g-tempo-num">{hud.bpm || '---'}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="cap">SCORE</div>
+          <div className="g-score">
+            {hud.score.toLocaleString()}
+            <span className="g-score-unit">pts</span>
+          </div>
+        </div>
+      </div>
 
-      {/* 上段：保留 ＋ スコア */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div className="g-glass g-hold">
-          <span className="g-label">NEXT</span>
-          {holds.map((c, i) => (
-            <span key={i} className={`g-hold-orb ${c}`}>
-              {c === 'rainbow' &&
-                ['#ff3d71', '#ffd54a', '#3dffa8', '#22e4ff'].map((x) => (
-                  <span key={x} style={{ background: x }} />
-                ))}
-            </span>
-          ))}
-        </div>
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <div className="g-label">SCORE</div>
-          <div className="g-score-num">{hud.score.toLocaleString()}</div>
-        </div>
+      {/* 保留 */}
+      <div className="g-hold">
+        <span className="cap" style={{ whiteSpace: 'nowrap' }}>NEXT</span>
+        {holds.map((c, i) => <span key={i} className={`g-hold-orb ${c}`} />)}
+        {holds.includes(HOLD.CONFIRM) && <span className="g-hold-hint">縞 = 確定</span>}
       </div>
 
       {/* 予告演出 / RUSH 帯 */}
@@ -521,43 +542,43 @@ export default function RhythmGame() {
 
       {/* コンボ ＋ 残り時間 */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <div className="g-combo-row">
           <motion.span
             key={hud.combo}
             className="g-combo-num"
-            initial={{ scale: 1.18 }}
+            initial={{ scale: 1.16 }}
             animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 16 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 15 }}
           >
             {hud.combo}
           </motion.span>
-          <span className="font-display" style={{ fontSize: '0.9rem', color: 'var(--g-rose)' }}>
-            COMBO
-          </span>
+          <span className="cap">COMBO</span>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div className="g-label">TIME</div>
-          <div className="font-display" style={{ fontSize: '1.3rem', color: '#cfc7f0' }}>
-            {mm}:{ss}
-          </div>
+          <div className="cap">TIME</div>
+          <div className="g-time">{mm}:{ss}</div>
         </div>
       </div>
 
-      {/* チャンスゲージ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="g-label" style={{ whiteSpace: 'nowrap' }}>CHANCE</span>
+      {/* チャージゲージ */}
+      <div className="g-gauge-row">
+        <span className="cap" style={{ whiteSpace: 'nowrap' }}>CHARGE</span>
         <div className="g-gauge">
-          <div className="g-gauge-fill" style={{ width: `${hud.gauge}%` }} />
+          <div className="g-gauge-blocks">
+            {Array.from({ length: GAUGE_BLOCKS }, (_, i) => (
+              <span
+                key={i}
+                className={i < gaugeBlocks ? (i >= GAUGE_BLOCKS - 3 ? 'hot' : 'on') : ''}
+              />
+            ))}
+          </div>
+          <div className="g-gauge-ticks">
+            {Array.from({ length: 5 }, (_, i) => <span key={i} />)}
+          </div>
         </div>
-        <button
-          onClick={toggleMute}
-          aria-label={muted ? '音を出す' : '音を消す'}
-          style={{
-            background: 'none', border: 'none', color: 'var(--g-text-dim)',
-            cursor: 'pointer', padding: 4, flex: 'none',
-          }}
-        >
-          {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+        <span className="g-gauge-val">{gaugeBlocks}/{GAUGE_BLOCKS}</span>
+        <button className="g-mute" onClick={toggleMute} aria-label={muted ? '音を出す' : '音を消す'}>
+          {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
         </button>
       </div>
 
@@ -566,19 +587,19 @@ export default function RhythmGame() {
         <div className="g-cam">
           <video ref={videoRef} playsInline muted />
         </div>
-        <span style={{ fontSize: '0.72rem', color: detected ? 'var(--g-green)' : 'var(--g-text-dim)' }}>
+        <span className={`g-cam-state ${detected ? 'on' : 'off'}`}>
           {detected ? '検出中' : '体が映るように調整してください'}
         </span>
       </div>
 
       {/* カウントダウン */}
       {phase === PHASE.COUNTDOWN && (
-        <div className="g-cutin" style={{ background: 'rgba(10,6,32,0.72)' }}>
+        <div className="g-cutin" style={{ background: 'rgba(18,12,11,0.82)' }}>
           <motion.span
             key={countdown}
             initial={{ scale: 1.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            style={{ color: 'var(--g-gold)', fontSize: '5rem' }}
+            style={{ color: 'var(--amber)', fontSize: '4.6rem', textShadow: '5px 5px 0 var(--amber-deep)' }}
           >
             {countdown}
           </motion.span>

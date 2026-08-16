@@ -156,17 +156,17 @@ export function shouldContinueRush(recentJudges) {
 
 /**
  * 終了ランクを判定する
- * 虹（フルコンボ）／金／銀／銅／完走
+ * 特級（フルコンボ）／一級／二級／三級／修了
  */
 export function calcRank(state) {
   const totalHits = state.goodCount + state.okCount;
   if (state.missCount === 0 && totalHits >= 30) {
-    return { tier: 'rainbow', label: '虹', name: 'フルコンボ！', color: '#ffd54a' };
+    return { tier: 'perfect', label: '特級', name: 'ノーミス達成', color: '#f5a623' };
   }
-  if (state.score >= 300000) return { tier: 'gold', label: '金', name: 'ゴールド', color: '#ffd54a' };
-  if (state.score >= 150000) return { tier: 'silver', label: '銀', name: 'シルバー', color: '#d7dce6' };
-  if (state.score >= 50000) return { tier: 'bronze', label: '銅', name: 'ブロンズ', color: '#e0a163' };
-  return { tier: 'clear', label: '完', name: '完走', color: '#9b8fd9' };
+  if (state.score >= 300000) return { tier: 'first', label: '一級', name: '極めて優秀', color: '#f5a623' };
+  if (state.score >= 150000) return { tier: 'second', label: '二級', name: '優秀', color: '#e03a2b' };
+  if (state.score >= 50000) return { tier: 'third', label: '三級', name: '良好', color: '#f2ede6' };
+  return { tier: 'clear', label: '修了', name: '完走', color: '#8c8076' };
 }
 
 /** アドバイス（リズムに特化） */

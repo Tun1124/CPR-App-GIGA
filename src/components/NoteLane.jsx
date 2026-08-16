@@ -1,8 +1,28 @@
 import { useEffect, useRef } from 'react';
-import { Heart } from 'lucide-react';
 import { JUDGE_LABEL } from '../utils/gameScoring';
 
-const RAINBOW = ['#ff3d71', '#ffd54a', '#3dffa8', '#22e4ff', '#b47cff'];
+/** 拍動マーク。ノーツにも記章にも使う、このアプリの署名となる形 */
+export function PulseMark({ width = 20, color = '#3d0f09', strokeWidth = 2.2 }) {
+  return (
+    <svg viewBox="0 0 24 12" width={width} height={width / 2} aria-hidden="true">
+      <polyline
+        points="0,6 7,6 10,1 13,11 16,6 24,6"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+      />
+    </svg>
+  );
+}
+
+/** 段階ごとの、拍動マークの線の色（地の色に対して沈める） */
+const MARK_COLOR = {
+  none: '#2f2925',
+  low: '#3d0f09',
+  mid: '#3d0f09',
+  high: '#2b1b04',
+  confirm: '#2b1b04',
+};
 
 /**
  * ノーツレーン
@@ -10,69 +30,49 @@ const RAINBOW = ['#ff3d71', '#ffd54a', '#3dffa8', '#22e4ff', '#b47cff'];
  * ノーツは「ペースメーカー」であり、採点には関与しない。
  * 採点は圧迫の間隔（60000/interval）で行うため、MediaPipe の遅延に影響されない。
  * 流れ去ったノーツは減点しない（絶対タイミング判定を裏口から入れないため）。
- *
- * @param {Array} notes    - [{ id, color, time }] time はヒットゾーン到達予定時刻
- * @param {number} nowRef  - 現在時刻（performance.now()）を持つ ref
- * @param {object} judge   - { type, key } 直近の判定（表示用）
  */
 export default function NoteLane({ notes, laneRef, judge, burstKey }) {
   const wrapRef = useRef(null);
 
-  // レーンの実幅を CSS 変数として渡す（ノーツの座標計算に使う）
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el || !laneRef) return;
-    laneRef.current = el;
+    if (laneRef) laneRef.current = wrapRef.current;
   }, [laneRef]);
 
   return (
-    <div ref={wrapRef} className="g-glass g-lane">
-      <div className="g-hit-zone" />
+    <div ref={wrapRef} className="g-lane">
+      {/* 背景に走る心電図の線 */}
+      <svg
+        className="g-lane-ecg"
+        viewBox="0 0 420 96"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <polyline
+          points="0,48 70,48 78,48 84,28 90,70 96,48 170,48 240,48 248,48 254,28 260,70 266,48 340,48 420,48"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
+
+      <div className="g-hit-bar" />
       <div className="g-hit-ring" />
 
-      {/* 判定リング中央の光 */}
-      {burstKey > 0 && (
-        <div
-          key={burstKey}
-          style={{
-            position: 'absolute',
-            left: 37,
-            top: '50%',
-            width: 28,
-            height: 28,
-            marginTop: -14,
-            borderRadius: '50%',
-            background: '#ffd54a',
-            boxShadow: '0 0 22px #ffd54a',
-            animation: 'g-burst 320ms ease-out forwards',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
+      {burstKey > 0 && <div key={burstKey} className="g-burst" />}
 
-      {/* 判定表示 */}
       {judge?.type && (
         <span key={judge.key} className={`g-judge ${judge.type}`}>
           {JUDGE_LABEL[judge.type]}
         </span>
       )}
 
-      {/* ノーツ */}
       {notes.map((n) => (
         <div
           key={n.id}
           className={`g-note ${n.color}`}
-          style={{ transform: `translate3d(${n.x}px, 0, 0)` }}
+          style={{ transform: `translate3d(${n.x}px, 0, 0) skewY(2.2deg)` }}
         >
-          {n.color === 'rainbow' ? (
-            RAINBOW.map((c) => <span key={c} style={{ background: c }} />)
-          ) : (
-            <Heart
-              size={22}
-              fill={n.color === 'white' ? 'none' : 'rgba(0,0,0,0.55)'}
-              color={n.color === 'white' ? '#cfc7f0' : 'rgba(0,0,0,0.55)'}
-            />
-          )}
+          <PulseMark color={MARK_COLOR[n.color] ?? '#2b2320'} />
         </div>
       ))}
     </div>
